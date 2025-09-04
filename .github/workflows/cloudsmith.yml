@@ -18,12 +18,12 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -t docker.cloudsmith.io/rini-jain-rnye/api_repo/testimage:latest .
+          docker build -t docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest .
 
       - name: Push image
         run: |
-          docker push docker.cloudsmith.io/rini-jain-rnye/api_repo/testimage:latest
+          docker push docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest
 
       - name: Pull image (verify)
         run: |
-          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/testimage:latest
+          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest
