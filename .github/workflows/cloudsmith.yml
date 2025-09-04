@@ -1,0 +1,29 @@
+name: Cloudsmith Push & Pull
+
+on:
+  workflow_dispatch:
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Cloudsmith
+        uses: docker/login-action@v3
+        with:
+          registry: docker.cloudsmith.io
+          username: ${{ secrets.CS_USER }}
+          password: ${{ secrets.CS_TOKEN }}
+
+      - name: Build image
+        run: |
+          docker build -t docker.cloudsmith.io/rini-jain-rnye/api_repo/testimage:latest .
+
+      - name: Push image
+        run: |
+          docker push docker.cloudsmith.io/rini-jain-rnye/api_repo/testimage:latest
+
+      - name: Pull image (verify)
+        run: |
+          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/testimage:latest
