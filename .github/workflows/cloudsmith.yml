@@ -1,4 +1,4 @@
-name: Cloudsmith Push & Pull
+name: Cloudsmith Push & Get Digest (Simple)
 
 on:
   workflow_dispatch:
@@ -13,8 +13,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: docker.cloudsmith.io
-          username: ${{ secrets.CS_USER }}
-          password: ${{ secrets.CS_TOKEN }}
+          username: ${{ secrets.CS_USER }}   # service account slug
+          password: ${{ secrets.CS_TOKEN }}  # entitlement token (download+upload)
 
       - name: Build image
         run: |
@@ -24,6 +24,19 @@ jobs:
         run: |
           docker push docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest
 
-      - name: Pull image (verify)
+      # ✅ No pull needed: get digest directly from registry via HEAD
+      - name: Get image digest (HEAD)
+        id: digest
         run: |
-          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest
+          MANIFEST_URL="https://docker.cloudsmith.io/v2/rini-jain-rnye/api_repo/vulnimage/manifests/latest"
+          DIGEST=$(curl -sI -u "${{ secrets.CS_USER }}:${{ secrets.CS_TOKEN }}" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            "$MANIFEST_URL" | awk -F': ' '/Docker-Content-Digest:/ {gsub(/\r/,"",$2); print $2; exit}')
+          echo "Digest: $DIGEST"
+          echo "DIGEST=$DIGEST" >> $GITHUB_ENV
+
+      # (optional) verify by digest
+      - name: Pull by digest (optional)
+        if: env.DIGEST != ''
+        run: |
+          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage@"$DIGEST"
