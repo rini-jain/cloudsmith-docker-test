@@ -1,42 +1,45 @@
-name: Cloudsmith Push & Get Digest (Simple)
+name: Same-token Push -> 403 (quarantine)
 
-on:
-  workflow_dispatch:
+on: { workflow_dispatch: {} }
 
 jobs:
-  docker:
+  repro:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Login to Cloudsmith
+      - name: Login (same token whole job)
         uses: docker/login-action@v3
         with:
           registry: docker.cloudsmith.io
-          username: ${{ secrets.CS_USER }}   # service account slug
-          password: ${{ secrets.CS_TOKEN }}  # entitlement token (download+upload)
+          username: ${{ secrets.CS_USER }}    # service account slug
+          password: ${{ secrets.CS_TOKEN }}   # entitlement (Download+Upload ON)
 
-      - name: Build image
+      - name: Build
         run: |
+          echo 'FROM alpine:3.20' > Dockerfile
+          echo 'RUN echo hi'     >> Dockerfile
           docker build -t docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest .
 
-      - name: Push image
+      - name: Push
         run: |
           docker push docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest
 
-      # ✅ No pull needed: get digest directly from registry via HEAD
-      - name: Get image digest (HEAD)
-        id: digest
+      # 👇 Same token; quarantine/policy should block reads now
+      - name: HEAD/GET manifest by TAG (expect 403 if quarantined)
         run: |
-          MANIFEST_URL="https://docker.cloudsmith.io/v2/rini-jain-rnye/api_repo/vulnimage/manifests/latest"
-          DIGEST=$(curl -sI -u "${{ secrets.CS_USER }}:${{ secrets.CS_TOKEN }}" \
+          set -eux
+          BASE="https://docker.cloudsmith.io/v2/rini-jain-rnye/api_repo/vulnimage/manifests"
+          # krane-style HEAD then GET
+          curl -sS -o /dev/null -w "HEAD=%{http_code}\n" \
+            -u "${{ secrets.CS_USER }}:${{ secrets.CS_TOKEN }}" \
             -H "Accept: application/vnd.oci.image.manifest.v1+json" \
-            "$MANIFEST_URL" | awk -F': ' '/Docker-Content-Digest:/ {gsub(/\r/,"",$2); print $2; exit}')
-          echo "Digest: $DIGEST"
-          echo "DIGEST=$DIGEST" >> $GITHUB_ENV
+            "${BASE}/latest" || true
+          curl -sS -o /dev/null -w "GET =%{http_code}\n" \
+            -u "${{ secrets.CS_USER }}:${{ secrets.CS_TOKEN }}" \
+            -H "Accept: application/vnd.oci.image.manifest.v1+json" \
+            "${BASE}/latest" || true
 
-      # (optional) verify by digest
-      - name: Pull by digest (optional)
-        if: env.DIGEST != ''
+      - name: Pull by TAG (expect 403 if quarantined)
         run: |
-          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage@"$DIGEST"
+          docker pull docker.cloudsmith.io/rini-jain-rnye/api_repo/vulnimage:latest || true
