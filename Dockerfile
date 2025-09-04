@@ -1,2 +1,2 @@
-FROM python:2.7
-CMD ["python", "-c", "print('Vulnerable test image running')"]
+FROM openjdk:8-jdk
+CMD ["java","-version"]
